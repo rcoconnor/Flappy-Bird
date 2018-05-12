@@ -1,5 +1,6 @@
 import pygame 
 import os
+import random 
 
 pygame.init()
 pygame.font.init()
@@ -29,6 +30,71 @@ def load_image(name, colorkey = None):
 	return image
 
 
+
+class Pipes(pygame.sprite.Sprite): 
+
+	def __init__(self, the_player): 
+		# load the images
+		self.player = the_player
+		self.bottom_image = load_image("Pipe_Long_bottom.png")
+		self.top_image = load_image("Pipe_Long.png")
+		self.space_between = 160 + random.randint(0, 20) * 5
+		self.did_collide = False
+		
+		# Positions
+		self.xpos = 360
+		self.ypos = round(random.randint(1, 33)* 20)
+
+		#check to make sure the y position is within bounds
+		while self.ypos > 620 or self.ypos < 130 - self.space_between: 
+			self.ypos = round(random.randint(1, 33) * 20)
+		
+
+		# create rects
+		self.bottom_rect = self.bottom_image.get_rect()
+		self.bottom_rect.topleft = (self.xpos, self.ypos)
+		self.top_rect = self.top_image.get_rect()
+		self.top_rect.bottomleft = (self.xpos, self.ypos - self.space_between)
+
+	def move_pipes(self): 
+		newpos = self.bottom_rect.move(-2, 0)
+		self.bottom_rect = newpos
+
+		newpos = self.top_rect.move(-2, 0)
+		self.top_rect = newpos
+
+		self.xpos -= 2
+
+
+	def does_collide(self): 
+		if self.top_rect.colliderect(self.player): 
+			self.did_collide = True
+			print("collsion detected")
+		if self.bottom_rect.colliderect(self.player): 
+			self.did_collide = True
+			print("collision detected")
+
+
+
+	def update(self): 
+		self.does_collide()		
+		self.move_pipes()
+
+
+
+
+
+	def offscren(self): 
+		if self.top_rect.right < 0: 
+			return True
+		return False
+
+
+
+ 
+
+
+
 class Player(pygame.sprite.Sprite): 
 	# This class will create a player class with
 	# 	- a sprite image and rect
@@ -44,6 +110,7 @@ class Player(pygame.sprite.Sprite):
 		self.ypos = 300
 		self.xpos = 120
 		self.rect.topleft = (self.xpos, self.ypos)
+		self.is_dead = False
 		
 		# physics properties
 		self.gravity = 0.5
@@ -52,20 +119,15 @@ class Player(pygame.sprite.Sprite):
 		self.air_resistance = 0.95
 
 	def jump(self): 
-		self.velocity -= self.lift
+		self.velocity -= self.lift		
+
+	"""def did_collide(self): 
+		if self.rect.colliderect():
+			print("collision detected") 
+			self.is_dead = True """
 
 	def update(self): 
 		# this funciton upadates all the values of the player's bird
-		# check to make sure the bird isn't too low
-		
-		"""if self.rect.bottom > height: 
-			self.y = height
-			self.velocity = 0
-
-		# check to make sure the bird isn't too high
-		if self.rect.top < 0: 
-			self.y = 0
-			self.velocity = 0 """
 
 		# update the birds position
 		self.velocity += self.gravity
@@ -73,12 +135,17 @@ class Player(pygame.sprite.Sprite):
 		newpos = self.rect.move(0, self.velocity)
 		self.rect = newpos
 
-		if self.rect.bottom > height: 
-			self.velocity *= -1
-
+		# check to make sure the bird isn't too low or too high
+	
 		if self.rect.top < 0: 
 			newpos = self.rect.move(0, self.rect.top)
 			self.velocity *= -0.85
+		if self.rect.bottom > 640: 
+			self.is_dead = True
+
+		#check to make sure the player is alive
+		#self.did_collide()
+
 
 
 class Background(pygame.sprite.Sprite): 
@@ -95,17 +162,16 @@ class Background(pygame.sprite.Sprite):
 
 def game_loop(): 
 
-	
 
-	screen.fill(blue)
-
-
+ 
 	player = Player()
 	BackGround = Background("imageBackground.png", [0,0])	
 
 	game_exit = False
-	allsprites = pygame.sprite.RenderPlain((player))
+	bird_sprite = pygame.sprite.RenderPlain((player))
 
+	pipe_list = []
+	pipe_list.append(Pipes(player))
 
 	clock = pygame.time.Clock()
 
@@ -118,16 +184,35 @@ def game_loop():
 			# if the player is trying to quit
 			if event.type == pygame.QUIT: 
 				game_exit = True
+			# exit if the player has died
+			if player.is_dead == True: 
+				game_exit = True
 			# handle jumping 
 			if event.type == pygame.KEYDOWN: 
-				if event.key == pygame.K_SPACE: 
+				if event.key == pygame.K_SPACE:
+					#if pipe_list[0].did_collide == False:  
 					player.jump()
 
+		 
+		 # space out the last element correctcly
+		if pipe_list[-1].xpos < 20: 
+			pipe_list.append(Pipes(player))
+		if pipe_list[0].offscren(): 
+			pipe_list.pop(0) 
 
-		allsprites.update()
-		screen.fill((255, 255, 255))
+
 		screen.blit(BackGround.image, BackGround.rect)
-		allsprites.draw(screen)
+
+		bird_sprite.update()
+
+		for each_pipe in pipe_list: 
+			each_pipe.update()
+			screen.blit(each_pipe.bottom_image, each_pipe.bottom_rect)
+			screen.blit(each_pipe.top_image, each_pipe.top_rect)
+
+
+		
+		bird_sprite.draw(screen)
 		pygame.display.update()
 
 	pygame.quit()
