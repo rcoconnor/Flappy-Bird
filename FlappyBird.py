@@ -8,6 +8,7 @@ pygame.font.init()
 # colors 
 white = (255, 255, 255)
 blue = (0, 0, 200)
+black = (0, 0, 0)
 
 height = 640
 width = 360
@@ -15,6 +16,10 @@ width = 360
 screen = pygame.display.set_mode((width, height))
 
 pygame.display.set_caption("Pickin Sticks")
+
+small_font = pygame.font.SysFont('Comic Sans MS', 15)
+med_font = pygame.font.SysFont('Comic Sans MS', 30)
+large_font = pygame.font.SysFont('Comic Sans MS', 50)
 
 def load_image(name, colorkey = None): 
 	try: 
@@ -32,21 +37,26 @@ def load_image(name, colorkey = None):
 
 
 class Pipes(pygame.sprite.Sprite): 
+	# This class will create a pipe object with:  
+	# 	- a sprite image and rect for each pipe
+	#	- an x and y position for the pipes
+	#	- functions to handle the movement of pipes and the score
 
 	def __init__(self, the_player): 
 		# load the images
 		self.player = the_player
 		self.bottom_image = load_image("Pipe_Long_bottom.png")
 		self.top_image = load_image("Pipe_Long.png")
-		self.space_between = 160 + random.randint(0, 20) * 5
+		self.space_between = 300
 		self.did_collide = False
+		self.did_player_pass = False
 		
 		# Positions
 		self.xpos = 360
 		self.ypos = round(random.randint(1, 33)* 20)
 
 		#check to make sure the y position is within bounds
-		while self.ypos > 620 or self.ypos < 130 - self.space_between: 
+		while self.ypos > height or self.ypos < self.space_between: 
 			self.ypos = round(random.randint(1, 33) * 20)
 		
 
@@ -56,34 +66,44 @@ class Pipes(pygame.sprite.Sprite):
 		self.top_rect = self.top_image.get_rect()
 		self.top_rect.bottomleft = (self.xpos, self.ypos - self.space_between)
 
+	
+	# this function will move the pipes until the player hits the pipe
 	def move_pipes(self): 
-		newpos = self.bottom_rect.move(-2, 0)
-		self.bottom_rect = newpos
+		if self.did_collide != True: 
+			newpos = self.bottom_rect.move(-2, 0)
+			self.bottom_rect = newpos
 
-		newpos = self.top_rect.move(-2, 0)
-		self.top_rect = newpos
+			newpos = self.top_rect.move(-2, 0)
+			self.top_rect = newpos
 
-		self.xpos -= 2
+			self.xpos -= 2
 
 
 	def does_collide(self): 
-		if self.top_rect.colliderect(self.player): 
-			self.did_collide = True
-			print("collsion detected")
+		# function to check if the player and pipe collide
+		# will set did_collide to true or false
 		if self.bottom_rect.colliderect(self.player): 
-			self.did_collide = True
-			print("collision detected")
+			if self.did_collide != True: 
+				self.did_collide = True
 
+		if self.top_rect.colliderect(self.player): 
+			if self.did_collide != True: 
+				self.did_collide = True
+			
+	# Function to increment the score for the player
+	def check_score(self): 
+		if self.top_rect.right < self.player.rect.right: 
+			if self.did_player_pass == False: 
+				self.did_player_pass = True
+				self.player.score += 1
 
 
 	def update(self): 
 		self.does_collide()		
 		self.move_pipes()
+		self.check_score()
 
-
-
-
-
+	# checks whether the pipe is offscreen
 	def offscren(self): 
 		if self.top_rect.right < 0: 
 			return True
@@ -111,6 +131,7 @@ class Player(pygame.sprite.Sprite):
 		self.xpos = 120
 		self.rect.topleft = (self.xpos, self.ypos)
 		self.is_dead = False
+		self.score = 0
 		
 		# physics properties
 		self.gravity = 0.5
@@ -121,10 +142,13 @@ class Player(pygame.sprite.Sprite):
 	def jump(self): 
 		self.velocity -= self.lift		
 
-	"""def did_collide(self): 
-		if self.rect.colliderect():
-			print("collision detected") 
-			self.is_dead = True """
+	
+	def display_score(self): 
+		score_string = "Score: " + str(self.score)
+		screen_text = med_font.render(score_string, True, black)
+		text_rect = screen_text.get_rect()
+		text_rect.center = (275, 30)
+		screen.blit(screen_text, text_rect)
 
 	def update(self): 
 		# this funciton upadates all the values of the player's bird
@@ -137,14 +161,20 @@ class Player(pygame.sprite.Sprite):
 
 		# check to make sure the bird isn't too low or too high
 	
-		if self.rect.top < 0: 
+		if self.rect.top <= 0: 
 			newpos = self.rect.move(0, self.rect.top)
 			self.velocity *= -0.85
-		if self.rect.bottom > 640: 
+		if self.rect.top > 690: 
 			self.is_dead = True
 
 		#check to make sure the player is alive
-		#self.did_collide()
+		if self.is_dead == True: 
+			self.gravity = 0
+			self.velocity = 0
+
+		#display the score
+		self.display_score()
+
 
 
 
@@ -159,6 +189,56 @@ class Background(pygame.sprite.Sprite):
 		self.rect.left, self.rect.top = location
 
 
+def message_to_screen(msg, color, y_displacement = 0, size = "small"): 
+	# Blits a message to the screen
+	if size == "small": 
+		screen_text = small_font.render(msg, True, color)
+	if size == "medium": 
+		screen_text = med_font.render(msg, True, color)
+	if size == "large": 
+		screen_text = large_font.render(msg, True, color)
+
+	text_rect = screen_text.get_rect()
+	text_rect.center = (width / 2), (height / 2) + y_displacement
+	screen.blit(screen_text, text_rect)
+
+def create_menu(): 
+	message_to_screen("Flap", black, -100, "large")
+	message_to_screen("By: Rory O'Connor", black, 0, "small")
+	message_to_screen("Press Space to Play", black, 100, "medium")
+	#message_to_screen("Press C for credits", black, 150, "small")
+
+
+def display_game_over(user_score): 
+	game_over_str = "Game Over"
+	play_again_str = "Press space to play again"
+	quit_string = "or Q to quit"
+	score_string = "Score: " + str(user_score)
+
+	message_to_screen(game_over_str, black, -20, "large")
+	message_to_screen(score_string, black, 25, "medium")
+	message_to_screen(play_again_str, black, 65, "small")
+	message_to_screen(quit_string, black, 85, "small")
+
+
+def main_menu(): 
+	intro = True
+	pygame.display.update()
+	while intro: 
+		screen.fill(white)
+		create_menu()
+		pygame.display.update()
+
+		for event in pygame.event.get(): 
+			if event.type == pygame.QUIT: 
+				intro = False
+				pygame.quit()
+				quit()
+			if event.type == pygame.KEYDOWN: 
+				if event.key == pygame.K_SPACE: 
+					intro = False
+
+
 
 def game_loop(): 
 
@@ -168,6 +248,8 @@ def game_loop():
 	BackGround = Background("imageBackground.png", [0,0])	
 
 	game_exit = False
+	is_game_over = False
+
 	bird_sprite = pygame.sprite.RenderPlain((player))
 
 	pipe_list = []
@@ -178,6 +260,22 @@ def game_loop():
 	while not game_exit: 
 		# lock the game to 50 fps
 		clock.tick(50)
+
+		while is_game_over == True:
+			screen.fill(white)
+			display_game_over(player.score)
+			pygame.display.update()
+
+			for event in pygame.event.get():
+				if event.type == pygame.KEYDOWN: 
+					if event.key == pygame.K_SPACE: 
+						game_loop()
+					if event.key == pygame.K_q: 
+						game_exit = True
+						is_game_over = False
+				if event.type == pygame.QUIT: 
+					is_game_over = False
+					game_exit = True
 
 		#Event Handling
 		for event in pygame.event.get(): 
@@ -190,8 +288,8 @@ def game_loop():
 			# handle jumping 
 			if event.type == pygame.KEYDOWN: 
 				if event.key == pygame.K_SPACE:
-					#if pipe_list[0].did_collide == False:  
-					player.jump()
+					if pipe_list[0].did_collide == False:  
+						player.jump()
 
 		 
 		 # space out the last element correctcly
@@ -203,14 +301,18 @@ def game_loop():
 
 		screen.blit(BackGround.image, BackGround.rect)
 
-		bird_sprite.update()
+		
 
 		for each_pipe in pipe_list: 
 			each_pipe.update()
 			screen.blit(each_pipe.bottom_image, each_pipe.bottom_rect)
 			screen.blit(each_pipe.top_image, each_pipe.top_rect)
 
+		# check if the player is under the screen
+		if player.rect.top > 660: 
+			is_game_over = True
 
+		bird_sprite.update()
 		
 		bird_sprite.draw(screen)
 		pygame.display.update()
@@ -218,4 +320,5 @@ def game_loop():
 	pygame.quit()
 	quit()
 
+main_menu()
 game_loop()
